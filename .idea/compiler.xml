@@ -9,5 +9,9 @@
         <module name="Sudoku" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="Sudoku (1)" target="16" />
+      <module name="Sudoku (2)" target="16" />
+    </bytecodeTargetLevel>
   </component>
 </project>
