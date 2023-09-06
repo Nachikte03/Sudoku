@@ -4,10 +4,22 @@
  */
 package com.mycompany.sudoku;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import javax.swing.JButton;
 import java.awt.Color;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import javax.swing.JOptionPane;
+
+import static java.awt.Color.green;
+import static java.awt.Color.red;
 
 /**
  *
@@ -15,24 +27,16 @@ import javax.swing.JOptionPane;
  */
 public class Sudoku extends javax.swing.JFrame {
 
-    String currNum = "1";
-    int[][] solution;
-    int[][] predefined;
-    JButton[][] btnGrid;
-    HashMap<JButton,String> map;
+    private final JButton[][] btnGrid;
+    private final HashMap<JButton, String> map;
+    private String currNum = "1";
+    private Integer[][] board;
     
     public Sudoku() {
         initComponents();
-        //select 1 as default
-        select1.setBackground(Color.green);
-        this.setTitle("Sudoku");
-        
-        //initialize grid;
-        solution = new int[9][9];
-        predefined = new int[9][9];
         map = new HashMap<>();
-        
-        //this should be decalred after initalCOomponets called
+        select1.setBackground(green);
+        this.setTitle("Sudoku");
         btnGrid = new JButton[][]{
         {r1c1,r1c2,r1c3,r1c4,r1c5,r1c6,r1c7,r1c8,r1c9},
         {r2c1,r2c2,r2c3,r2c4,r2c5,r2c6,r2c7,r2c8,r2c9},
@@ -44,20 +48,64 @@ public class Sudoku extends javax.swing.JFrame {
         {r8c1,r8c2,r8c3,r8c4,r8c5,r8c6,r8c7,r8c8,r8c9},
         {r9c1,r9c2,r9c3,r9c4,r9c5,r9c6,r9c7,r9c8,r9c9}
        };
-        
-        CreateBoard b = new CreateBoard();
-        predefined = b.board;
-        solution = b.solution;
 
+        board = new Integer[][]{
+                {3, 0, 2, 0, 5, 0, 0, 0, 8},
+                {0, 7, 0, 3, 0, 0, 0, 9, 0},
+                {0, 0, 5, 0, 7, 0, 3, 0, 1},
+                {7, 0, 0, 4, 0, 0, 0, 5, 0},
+                {0, 3, 0, 8, 0, 5, 0, 0, 0},
+                {4, 0, 0, 0, 1, 0, 6, 0, 2},
+                {0, 0, 0, 0, 0, 7, 8, 6, 0},
+                {0, 0, 7, 0, 8, 9, 0, 0, 0},
+                {0, 9, 0, 0, 3, 0, 1, 0, 0}
+        };
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:8080/getBoard/hard"))
+                    .method("GET", HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            ObjectMapper objectMapper = new ObjectMapper();
+            board = objectMapper.readValue(response.body().substring(8).substring(1), Integer[][].class);
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+    
+    
+    public void method(){
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:8080/getBoard/hard"))
+                    .method("GET", HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            ObjectMapper objectMapper = new ObjectMapper();
+            board = objectMapper.readValue(response.body().substring(8).substring(1), Integer[][].class);
+            map.clear();
+            initializeBoard();
+            resetGrid();
+
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     //call this after solution is created
     public void initializeBoard(){
         for(int i=0;i<9;i++){
             for(int j=0;j<9;j++){
-                if(predefined[i][j]!=0){
+                if(board[i][j]!=0){
                     JButton curr = btnGrid[i][j];
-                    String text = String.valueOf(predefined[i][j]);
+                    String text = String.valueOf(board[i][j]);
                     curr.setText(text);
                     curr.setBackground(new Color(102,0,153));
                     map.put(curr,text);
@@ -83,6 +131,20 @@ public class Sudoku extends javax.swing.JFrame {
             }
         }
     }
+
+    private boolean isValid(int row,int column,int num,Integer[][] board){
+        for(int i=0;i<9;i++){
+            if(board[row][i] == num || board[i][column] == num) return false;
+        }
+        int box_row = 3*(row/3);
+        int box_column = 3*(column/3);
+        for(int i=0;i<3;i++){
+            for(int j=0;j<3;j++){
+                if(board[box_row+i][box_column+j]==num) return false;
+            }
+        }
+        return 1==1;
+    }
     
     
     
@@ -97,7 +159,6 @@ public class Sudoku extends javax.swing.JFrame {
                 }
                 else{
                     JButton curr = btnGrid[i][j];
-                    curr.setText(String.valueOf(solution[i][j]));
                     curr.setBackground(new Color(255,255,255));
                 }
             }
@@ -108,27 +169,34 @@ public class Sudoku extends javax.swing.JFrame {
     
     
     public void check(){
+        Integer[][] k = new Integer[9][9];
         for(int i=0;i<9;i++){
             for(int j=0;j<9;j++){
-                if(map.containsKey(btnGrid[i][j])){
-                    JButton curr = btnGrid[i][j];
-                    curr.setText(map.get(curr));
-                    curr.setBackground(new Color(102,0,153));
+                String p = btnGrid[i][j].getText();
+                if(p.equals("") || p==null){
+                    k[i][j] = 0;
                 }
                 else{
-                    JButton curr = btnGrid[i][j];
-                    String currText = curr.getText();
-                    String correctText = String.valueOf(solution[i][j]);
-                    if(currText.equals("")){
-                        continue;
-                    }
-                    if(currText.equals(correctText)){
-                        curr.setBackground(Color.green);
-                    }
-                    else{
-                        curr.setBackground(Color.red);
-                    }
+                    k[i][j] = Integer.parseInt(btnGrid[i][j].getText());
                 }
+            }
+        }
+        for(int i=0;i<9;i++){
+            for(int j=0;j<9;j++){
+                String p = btnGrid[i][j].getText();
+                if(map.containsKey(btnGrid[i][j]) || p.equals("")){
+                    continue;
+                }
+                int value = k[i][j];
+                k[i][j] = 11;
+                boolean result = isValid(i,j,value,k);
+                if(result){
+                    btnGrid[i][j].setBackground(green);
+                }
+                else{
+                    btnGrid[i][j].setBackground(red);
+                }
+                k[i][j] = value;
             }
         }
     }
@@ -146,10 +214,6 @@ public class Sudoku extends javax.swing.JFrame {
                 else{
                     JButton curr = btnGrid[i][j];
                     String currText = curr.getText();
-                    String correctText = String.valueOf(solution[i][j]);
-                    if(currText.equals("")){
-                        continue;
-                    }
                     curr.setBackground(Color.WHITE);
                 }
             }
@@ -189,7 +253,7 @@ public class Sudoku extends javax.swing.JFrame {
         select8.setBackground(Color.magenta);
         select9.setBackground(Color.magenta);
         
-        currBtn.setBackground(Color.green);
+        currBtn.setBackground(green);
     }
     
     /**
@@ -305,8 +369,8 @@ public class Sudoku extends javax.swing.JFrame {
         jPanel10 = new javax.swing.JPanel();
         resetBtn = new javax.swing.JButton();
         exitBtn = new javax.swing.JButton();
-        solutionBtn = new javax.swing.JButton();
         checkBtn = new javax.swing.JButton();
+        solutionBtn = new javax.swing.JButton();
 
         javax.swing.GroupLayout jPanel12Layout = new javax.swing.GroupLayout(jPanel12);
         jPanel12.setLayout(jPanel12Layout);
@@ -1414,14 +1478,6 @@ public class Sudoku extends javax.swing.JFrame {
             }
         });
 
-        solutionBtn.setBackground(new java.awt.Color(0, 255, 102));
-        solutionBtn.setText("Solution");
-        solutionBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                solutionBtnActionPerformed(evt);
-            }
-        });
-
         checkBtn.setBackground(new java.awt.Color(255, 255, 102));
         checkBtn.setText("Check");
         checkBtn.addActionListener(new java.awt.event.ActionListener() {
@@ -1430,20 +1486,28 @@ public class Sudoku extends javax.swing.JFrame {
             }
         });
 
+        solutionBtn.setBackground(new java.awt.Color(0, 255, 102));
+        solutionBtn.setText("Create");
+        solutionBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                solutionBtnActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel10Layout = new javax.swing.GroupLayout(jPanel10);
         jPanel10.setLayout(jPanel10Layout);
         jPanel10Layout.setHorizontalGroup(
             jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel10Layout.createSequentialGroup()
-                .addGap(30, 30, 30)
+                .addContainerGap(46, Short.MAX_VALUE)
+                .addComponent(solutionBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(20, 20, 20)
                 .addComponent(resetBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(26, 26, 26)
+                .addGap(20, 20, 20)
                 .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(26, 26, 26)
-                .addComponent(solutionBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 26, Short.MAX_VALUE)
+                .addGap(20, 20, 20)
                 .addComponent(checkBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(30, 30, 30))
+                .addGap(40, 40, 40))
         );
         jPanel10Layout.setVerticalGroup(
             jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1452,8 +1516,8 @@ public class Sudoku extends javax.swing.JFrame {
                 .addGroup(jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(resetBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(solutionBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(checkBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(checkBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(solutionBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(15, Short.MAX_VALUE))
         );
 
@@ -1960,14 +2024,6 @@ public class Sudoku extends javax.swing.JFrame {
         
     }//GEN-LAST:event_exitBtnActionPerformed
 
-    private void solutionBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_solutionBtnActionPerformed
-        // TODO add your handling code here:
-        int dialogResult = JOptionPane.showConfirmDialog(this,"Confirm Checking Solution");
-        if(dialogResult==JOptionPane.YES_NO_OPTION){
-            display();
-        }
-    }//GEN-LAST:event_solutionBtnActionPerformed
-
     private void checkBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBtnActionPerformed
         // TODO add your handling code here:
         String text = checkBtn.getText();
@@ -2020,6 +2076,14 @@ public class Sudoku extends javax.swing.JFrame {
         // TODO add your handling code here:
         setValue(6,8);
     }//GEN-LAST:event_r7c9ActionPerformed
+
+    private void solutionBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_solutionBtnActionPerformed
+        // TODO add your handling code here:
+        int k = JOptionPane.showConfirmDialog(this, "This will create new Board");
+        if(k==JOptionPane.YES_OPTION){
+            method();
+        }
+    }//GEN-LAST:event_solutionBtnActionPerformed
 
     /**
      * @param args the command line arguments
